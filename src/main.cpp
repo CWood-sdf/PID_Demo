@@ -28,6 +28,8 @@ motor BR = motor(PORT5, ratio18_1, true);
 motor_group Left = motor_group(FL, BL);
 motor_group Right = motor_group(FR, BR);
 
+controller Controller = controller();
+
 /**
  * @brief This function makes sure that the angle is between -180 and 180
  *
@@ -54,11 +56,11 @@ double posNeg180(double a)
  * These values need to be tuned to use the PID
  *
  */
-double kP = 0;
-double kI = 0;
-double kD = 0;
+double turnKP = 0;
+double turnKI = 0;
+double turnKD = 0;
 
-void turnPid(double target, double maxError)
+void turnPid(double target, double maxError = 1)
 {
     target = posNeg180(target);
     double integral = 0;
@@ -68,8 +70,12 @@ void turnPid(double target, double maxError)
     int timeInterval = 10; // ms
     int timeInRange = 0;
 
-    while (timeInRange < 300)
+    int timeTaken = 0;
+    while (timeInRange < 100)
     {
+        if(timeTaken > 5000){
+            cout << "5 second turn loop timeout" << endl;
+        }
         // Get the current angle
         double currentAngle = posNeg180(Inertial.rotation());
 
@@ -83,7 +89,7 @@ void turnPid(double target, double maxError)
         double derivative = error - lastError;
 
         // Get the power
-        double power = kP * error + kI * integral + kD * derivative;
+        double power = turnKP * error + turnKI * integral + turnKD * derivative;
 
         // Spin the motors
         Left.spin(forward, power, voltageUnits::volt);
@@ -104,9 +110,51 @@ void turnPid(double target, double maxError)
 
         // Wait
         wait(timeInterval, msec);
+        timeTaken += timeInterval;
     }
     cout << "PID Done" << endl;
     cout << "Current Angle: " << Inertial.rotation() << ", Target Angle:" << target << endl;
+}
+int update(){
+    while(1){
+        if(Controller.ButtonA.pressing()){
+            while(Controller.ButtonA.pressing()){
+                wait(10, msec);
+            }
+            return 1;
+        }
+        if(Controller.ButtonB.pressing()){
+            while(Controller.ButtonB.pressing()){
+                wait(10, msec);
+            }
+            return 0;
+        }
+        if(Controller.ButtonX.pressing()){
+            while(Controller.ButtonX.pressing()){
+                wait(10, msec);
+            }
+            return -1;
+        }
+        wait(10, msec);
+    }
+}
+void updateValues(){
+    cout << "turnKP" << endl;   
+    turnKP += pInc * update();
+    cout << "turnKD" << endl;
+    turnKD += dInc * update();
+    cout << "double turnKP = " << turnKP << ";\ndouble turnKD = " << turnKD << ";" << endl;
+
+}
+void tunePid(){
+    double pInc = 0.1;
+    double dInc = 0.05;
+    while(1){
+        turnPid(90, 1);
+        updateValues();
+        turnPid(0, 1);
+        updateValues();
+    }
 }
 
 int main()
